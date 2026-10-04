@@ -1,17 +1,21 @@
 {
   "name": "claim-server",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Airdrop claim backend — distributes project tokens to eligible users. No user-side approvals.",
+  "type": "module",
+  "description": "Solana airdrop backend — distributes project tokens to eligible users.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
   "dependencies": {
+    "@solana/client": "^1.7.0",
+    "@solana/kit": "^8.4.0",
+    "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "ethers": "^6.13.2",
-    "express": "^4.19.2"
+    "express": "^4.21.2",
+    "tweetnacl": "^1.0.3"
   }
 }

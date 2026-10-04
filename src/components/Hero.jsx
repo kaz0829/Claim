@@ -12,10 +12,22 @@ export default function Hero() {
         {config.ui.kicker}
       </p>
       <h1 className="font-display text-5xl leading-[0.95] font-extrabold tracking-tight text-balance break-words sm:text-6xl">
-        {config.tokenName}
+        {config.heroLines.map((line, index) => (
+          <span className={index === 1 ? "text-[var(--c-primary)]" : ""} key={line}>
+            {line}
+            {index < config.heroLines.length - 1 && <br />}
+          </span>
+        ))}
       </h1>
-      <p className="mt-3 font-display text-2xl font-bold text-[var(--c-primary)]">${config.ticker}</p>
       <p className="mx-auto mt-4 max-w-md text-lg leading-relaxed text-white/70 md:mx-0">{config.tagline}</p>
+      <div className="mt-6 grid grid-cols-3 gap-2">
+        {config.facts.map((fact) => (
+          <div className="market-stat" key={fact.label}>
+            <strong>{fact.value}</strong>
+            <span>{fact.label}</span>
+          </div>
+        ))}
+      </div>
       {links.length > 0 && (
         <div className="mt-6 flex flex-wrap justify-center gap-3 md:justify-start">
           {links.map((link) => (

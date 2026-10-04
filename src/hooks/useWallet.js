@@ -2,13 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import config from "../config.js";
 import { messageFor } from "../lib/errors.js";
 import { readFlag, writeFlag } from "../lib/format.js";
-import { getProvider, hasInjectedWallet, switchToChain } from "../lib/wallet.js";
+import { getProvider, hasInjectedWallet, publicKeyString } from "../lib/wallet.js";
 
 const DISMISS_KEY = "claim-wallet-dismissed";
 
 export function useWallet() {
   const [address, setAddress] = useState(null);
-  const [chainId, setChainId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [walletReady, setWalletReady] = useState(null);
@@ -16,23 +15,17 @@ export function useWallet() {
   const sync = useCallback(async () => {
     if (!hasInjectedWallet() || readFlag(DISMISS_KEY) === "1") {
       setAddress(null);
-      setChainId(null);
       return;
     }
     try {
       const provider = getProvider();
-      const accounts = await provider.send("eth_accounts", []);
-      if (!accounts?.length) {
+      if (provider.isConnected && provider.publicKey) {
+        setAddress(publicKeyString(provider));
+      } else {
         setAddress(null);
-        setChainId(null);
-        return;
       }
-      const network = await provider.getNetwork();
-      setAddress(accounts[0]);
-      setChainId(Number(network.chainId));
     } catch {
       setAddress(null);
-      setChainId(null);
     }
   }, []);
 
@@ -43,14 +36,17 @@ export function useWallet() {
       detach();
       setWalletReady(hasInjectedWallet());
       if (!hasInjectedWallet()) return;
+      const provider = getProvider();
       const onAccounts = () => sync();
-      const onChain = () => sync();
-      window.ethereum.on?.("accountsChanged", onAccounts);
-      window.ethereum.on?.("chainChanged", onChain);
+      const onDisconnect = () => setAddress(null);
+      provider.on?.("accountChanged", onAccounts);
+      provider.on?.("connect", onAccounts);
+      provider.on?.("disconnect", onDisconnect);
       sync();
       detach = () => {
-        window.ethereum?.removeListener?.("accountsChanged", onAccounts);
-        window.ethereum?.removeListener?.("chainChanged", onChain);
+        provider.removeListener?.("accountChanged", onAccounts);
+        provider.removeListener?.("connect", onAccounts);
+        provider.removeListener?.("disconnect", onDisconnect);
       };
     };
 
@@ -74,11 +70,8 @@ export function useWallet() {
     try {
       writeFlag(DISMISS_KEY, null);
       const provider = getProvider();
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      const network = await provider.getNetwork();
-      setAddress(await signer.getAddress());
-      setChainId(Number(network.chainId));
+      await provider.connect();
+      setAddress(publicKeyString(provider));
     } catch (err) {
       const text = messageFor(err);
       setError(text === config.ui.claimFailedText ? config.ui.connectFailedText : text);
@@ -89,34 +82,23 @@ export function useWallet() {
 
   const disconnect = useCallback(() => {
     writeFlag(DISMISS_KEY, "1");
+    try {
+      getProvider().disconnect?.();
+    } catch {
+      /* wallet is already disconnected */
+    }
     setAddress(null);
-    setChainId(null);
     setError("");
   }, []);
 
-  const switchNetwork = useCallback(async () => {
-    setError("");
-    setBusy(true);
-    try {
-      await switchToChain(config.chain);
-      await sync();
-    } catch (err) {
-      setError(messageFor(err) === config.ui.claimFailedText ? config.ui.switchFailedText : messageFor(err));
-    } finally {
-      setBusy(false);
-    }
-  }, [sync]);
-
   return {
     address,
-    chainId,
     busy,
     error,
     setError,
     walletReady,
-    onConfiguredChain: chainId === config.chain.chainId,
+    onConfiguredChain: true,
     connect,
     disconnect,
-    switchNetwork,
   };
 }

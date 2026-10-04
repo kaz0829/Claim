@@ -9,7 +9,7 @@ export default function Logo({ className = "", framed = false }) {
     <span
       className={
         framed
-          ? "grid h-full w-full place-items-center rounded-full bg-[var(--c-primary)] font-display text-3xl font-extrabold text-[#14140f]"
+          ? "grid h-full w-full place-items-center rounded-[20px] bg-[var(--c-primary)] font-display text-3xl font-extrabold text-[#14140f]"
           : `${className} grid place-items-center bg-[var(--c-primary)] font-display font-extrabold text-[#14140f]`
       }
     >
@@ -23,7 +23,7 @@ export default function Logo({ className = "", framed = false }) {
     <img
       src={config.logoUrl}
       alt=""
-      className={framed ? "h-full w-full rounded-full object-cover" : `${className} object-cover`}
+      className={framed ? "h-full w-full rounded-[20px] object-cover" : `${className} object-cover`}
       onError={() => setFailed(true)}
     />
   );

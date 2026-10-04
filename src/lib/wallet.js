@@ -1,12 +1,43 @@
-import { BrowserProvider } from "ethers";
-
-export function hasInjectedWallet() {
-  return typeof window !== "undefined" && Boolean(window.ethereum);
+function injectedProviders() {
+  if (typeof window === "undefined") return [];
+  return [
+    window.phantom?.solana,
+    window.solflare,
+    window.backpack,
+    window.solana,
+  ].filter(Boolean);
 }
 
 export function getProvider() {
-  if (!hasInjectedWallet()) throw new Error("NO_WALLET");
-  return new BrowserProvider(window.ethereum);
+  const provider = injectedProviders().find(
+    (candidate, index, providers) =>
+      providers.indexOf(candidate) === index &&
+      typeof candidate.connect === "function" &&
+      typeof candidate.signMessage === "function",
+  );
+  if (!provider) throw new Error("NO_WALLET");
+  return provider;
+}
+
+export function hasInjectedWallet() {
+  try {
+    return Boolean(getProvider());
+  } catch {
+    return false;
+  }
+}
+
+export function publicKeyString(provider) {
+  const value = provider?.publicKey?.toString?.();
+  if (!value) throw new Error("NO_WALLET");
+  return value;
+}
+
+export function signatureToBase64(signature) {
+  const bytes = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
 }
 
 export function assertPrepared(prepared) {
@@ -17,30 +48,4 @@ export function assertPrepared(prepared) {
     message: prepared.message,
     description: typeof prepared.description === "string" ? prepared.description : "",
   };
-}
-
-export async function switchToChain(chain) {
-  if (!hasInjectedWallet()) throw new Error("NO_WALLET");
-  const chainId = `0x${chain.chainId.toString(16)}`;
-  try {
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId }],
-    });
-  } catch (error) {
-    const missing = error?.code === 4902 || error?.data?.originalError?.code === 4902;
-    if (!missing) throw error;
-    await window.ethereum.request({
-      method: "wallet_addEthereumChain",
-      params: [
-        {
-          chainId,
-          chainName: chain.chainName,
-          rpcUrls: [chain.rpcUrl],
-          nativeCurrency: chain.nativeCurrency,
-          blockExplorerUrls: chain.explorerUrl ? [chain.explorerUrl] : undefined,
-        },
-      ],
-    });
-  }
 }

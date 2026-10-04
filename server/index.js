@@ -1,224 +1,245 @@
 /**
- * Airdrop claim backend (distribution only).
+ * Solana SPL-token airdrop service.
  *
- * Funds flow one direction: from the project's distributor wallet to the
- * claimer. The user never approves or transfers anything. They sign a plain
- * message so we can prove they control the address, then this service sends
- * their allocation with a standard ERC-20 `transfer`.
- *
- * It will never ask a user to `approve` a spender or build a `transferFrom`
- * that pulls tokens out of their wallet. That is a drainer pattern, not a
- * claim.
+ * The claimant signs a plain text message. After verification, this server
+ * transfers tokens from the distributor's associated token account to the
+ * claimant's associated token account. It never requests a user transaction.
  */
-require("dotenv").config();
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
-const express = require("express");
-const cors = require("cors");
-const { ethers } = require("ethers");
+import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
+import express from "express";
+import cors from "cors";
+import bs58 from "bs58";
+import nacl from "tweetnacl";
+import { createClient } from "@solana/client";
+import { address, createKeyPairSignerFromBytes } from "@solana/kit";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
-app.use(express.json());
+app.use(express.json({ limit: "16kb" }));
 
-const RPC_URL = process.env.RPC_URL;
-const DISTRIBUTOR_PRIVATE_KEY = process.env.DISTRIBUTOR_PRIVATE_KEY;
-const CHAIN_LABEL = process.env.CHAIN_LABEL || "the configured network";
+const RPC_URL = process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
+const DISTRIBUTOR_PRIVATE_KEY = process.env.DISTRIBUTOR_PRIVATE_KEY || "";
+const EXPECTED_MINT = process.env.TOKEN_MINT || "";
 const NONCE_TTL_MS = Number(process.env.NONCE_TTL_MS || 10 * 60 * 1000);
+const solana = createClient({ endpoint: RPC_URL });
 
-if (!RPC_URL || !DISTRIBUTOR_PRIVATE_KEY) {
-  console.warn(
-    "[claim] RPC_URL and DISTRIBUTOR_PRIVATE_KEY are not set. Copy .env.example to .env before going live.",
-  );
-}
-
-const provider = RPC_URL ? new ethers.JsonRpcProvider(RPC_URL) : null;
-const distributor =
-  provider && DISTRIBUTOR_PRIVATE_KEY ? new ethers.Wallet(DISTRIBUTOR_PRIVATE_KEY, provider) : null;
-
-const ERC20_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-];
-
-/**
- * Allocations: who may claim and how much (in whole token units).
- * Edit server/allocations.json — { "0xaddress": "1000", ... } — or set a flat
- * DEFAULT_ALLOCATION for every address. An address with no allocation is not
- * eligible, so no one can claim what you did not assign.
- */
-function loadAllocations() {
-  const file = path.join(__dirname, "allocations.json");
-  if (!fs.existsSync(file)) return {};
+async function readKeypair(value) {
+  if (!value) return null;
   try {
-    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-    return Object.fromEntries(
-      Object.entries(parsed).map(([address, amount]) => [address.toLowerCase(), String(amount)]),
-    );
-  } catch (err) {
-    console.error("[claim] allocations.json is not valid JSON:", err.message);
-    return {};
+    const bytes = value.trim().startsWith("[")
+      ? Uint8Array.from(JSON.parse(value))
+      : bs58.decode(value.trim());
+    return await createKeyPairSignerFromBytes(bytes);
+  } catch {
+    throw new Error("DISTRIBUTOR_PRIVATE_KEY must be a base58 key or JSON byte array");
   }
 }
 
-const allocations = loadAllocations();
+let distributor = null;
+try {
+  distributor = await readKeypair(DISTRIBUTOR_PRIVATE_KEY);
+} catch (error) {
+  console.error(`[claim] ${error.message}`);
+}
+
+function readJson(filename, fallback = {}) {
+  const file = path.join(__dirname, filename);
+  if (!fs.existsSync(file)) return fallback;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    console.error(`[claim] ${filename} is invalid: ${error.message}`);
+    return fallback;
+  }
+}
+
+const allocations = readJson("allocations.json");
+const claimed = readJson("claims.json");
 const defaultAllocation = process.env.DEFAULT_ALLOCATION || "";
+const pendingNonces = new Map();
+const processing = new Set();
 
-// In-memory only. Use a database before production so pending nonces and
-// completed claims survive a restart.
-const pendingNonces = new Map(); // key -> { message, nonce, issuedAt }
-const claimed = new Map(); // key -> txHash
+function isPublicKey(value) {
+  try {
+    address(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-const keyOf = (token, user) => `${token.toLowerCase()}:${user.toLowerCase()}`;
+function keyOf(mint, user) {
+  return `${mint}:${user}`;
+}
 
 function allocationFor(user) {
-  const amount = allocations[user.toLowerCase()] ?? defaultAllocation;
+  const amount = allocations[user] ?? defaultAllocation;
   return amount && Number(amount) > 0 ? String(amount) : null;
 }
 
-function buildMessage(token, user, nonce) {
+function persistClaims() {
+  const target = path.join(__dirname, "claims.json");
+  const temporary = `${target}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(claimed, null, 2));
+  fs.renameSync(temporary, target);
+}
+
+function buildMessage(mint, user, nonce) {
   return [
-    "Airdrop claim",
-    `Token: ${token}`,
-    `Address: ${user}`,
+    "STONK community airdrop",
+    `Mint: ${mint}`,
+    `Wallet: ${user}`,
     `Nonce: ${nonce}`,
     `Issued: ${new Date().toISOString()}`,
-    "Signing proves you control this wallet. It does not move any funds.",
+    "This signature is free and does not authorize a transaction.",
   ].join("\n");
 }
 
+function validateMint(mint) {
+  if (!isPublicKey(mint)) return "valid Solana token mint required";
+  if (EXPECTED_MINT && mint !== EXPECTED_MINT) return "unsupported token mint";
+  return "";
+}
+
 app.get("/", (_req, res) => {
-  res.json({ status: "operational", service: "airdrop-claim", mode: "distribution", version: "2.0.0" });
+  res.json({
+    status: "operational",
+    service: "stonk-airdrop",
+    chain: "solana",
+    mode: "distribution-only",
+    version: "3.0.0",
+  });
 });
 
-/**
- * Step 1 — prepare. Returns the message the user signs. No transaction, no
- * approval. The signature only proves address ownership.
- */
-app.post("/prepare-claim", async (req, res) => {
-  try {
-    const { token, user } = req.body || {};
-    if (!ethers.isAddress(token)) return res.status(400).json({ error: "valid token address required" });
-    if (!ethers.isAddress(user)) return res.status(400).json({ error: "valid user address required" });
+app.post("/prepare-claim", (req, res) => {
+  const { token, user } = req.body || {};
+  const mintError = validateMint(token);
+  if (mintError) return res.status(400).json({ error: mintError });
+  if (!isPublicKey(user)) return res.status(400).json({ error: "valid Solana wallet required" });
 
-    const key = keyOf(token, user);
-    if (claimed.has(key)) {
-      return res.status(409).json({ error: "this address has already claimed" });
-    }
+  const key = keyOf(token, user);
+  if (claimed[key]) return res.status(409).json({ error: "this wallet has already claimed" });
 
-    const amount = allocationFor(user);
-    if (!amount) return res.status(403).json({ error: "this address is not eligible for the airdrop" });
+  const amount = allocationFor(user);
+  if (!amount) return res.status(403).json({ error: "this wallet is not eligible for this drop" });
 
-    const nonce = crypto.randomUUID();
-    const message = buildMessage(token, user, nonce);
-    pendingNonces.set(key, { message, nonce, issuedAt: Date.now() });
+  const nonce = crypto.randomUUID();
+  const message = buildMessage(token, user, nonce);
+  pendingNonces.set(key, { message, issuedAt: Date.now() });
 
-    res.json({
-      message,
-      nonce,
-      token,
-      user,
-      amount,
-      description: `You will receive ${amount} tokens. Sign to confirm — this does not move funds from your wallet.`,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "unable to prepare claim" });
-  }
+  return res.json({
+    message,
+    nonce,
+    token,
+    user,
+    amount,
+    description: `Eligible for ${amount} STONK. Signing is free and cannot move assets.`,
+  });
 });
 
-/**
- * Step 2 — submit. Verifies the signature, then sends the allocation from the
- * distributor wallet to the user. Funds only ever move project -> user.
- */
 app.post("/submit-claim", async (req, res) => {
-  try {
-    if (!distributor) {
-      return res.status(503).json({ error: "distribution wallet is not configured" });
-    }
+  const { token, user, signature } = req.body || {};
+  const mintError = validateMint(token);
+  if (mintError) return res.status(400).json({ error: mintError });
+  if (!isPublicKey(user)) return res.status(400).json({ error: "valid Solana wallet required" });
+  if (typeof signature !== "string" || !signature) {
+    return res.status(400).json({ error: "signature required" });
+  }
+  if (!distributor) {
+    return res.status(503).json({ error: "distribution wallet is not configured" });
+  }
 
-    const { token, user, signature } = req.body || {};
-    if (!ethers.isAddress(token)) return res.status(400).json({ error: "valid token address required" });
-    if (!ethers.isAddress(user)) return res.status(400).json({ error: "valid user address required" });
-    if (typeof signature !== "string" || !signature) {
-      return res.status(400).json({ error: "signature required" });
-    }
+  const key = keyOf(token, user);
+  if (claimed[key]) return res.status(409).json({ error: "this wallet has already claimed" });
+  if (processing.has(key)) return res.status(409).json({ error: "this claim is already processing" });
 
-    const key = keyOf(token, user);
-    if (claimed.has(key)) {
-      return res.status(409).json({ error: "this address has already claimed" });
-    }
-
-    const pending = pendingNonces.get(key);
-    if (!pending) return res.status(400).json({ error: "no pending claim — call /prepare-claim first" });
-    if (Date.now() - pending.issuedAt > NONCE_TTL_MS) {
-      pendingNonces.delete(key);
-      return res.status(400).json({ error: "claim request expired — start again" });
-    }
-
-    let recovered;
-    try {
-      recovered = ethers.verifyMessage(pending.message, signature);
-    } catch {
-      return res.status(400).json({ error: "signature could not be verified" });
-    }
-    if (recovered.toLowerCase() !== user.toLowerCase()) {
-      return res.status(401).json({ error: "signature does not match the claiming address" });
-    }
-
-    const amount = allocationFor(user);
-    if (!amount) return res.status(403).json({ error: "this address is not eligible for the airdrop" });
-
-    // Consume the nonce up front so a replay cannot ride the same signature.
+  const pending = pendingNonces.get(key);
+  if (!pending) return res.status(400).json({ error: "no pending claim — start again" });
+  if (Date.now() - pending.issuedAt > NONCE_TTL_MS) {
     pendingNonces.delete(key);
+    return res.status(400).json({ error: "claim request expired — start again" });
+  }
 
-    const contract = new ethers.Contract(token, ERC20_ABI, distributor);
-    const decimals = await contract.decimals();
-    const value = ethers.parseUnits(amount, decimals);
+  let signatureBytes;
+  try {
+    signatureBytes = Buffer.from(signature, "base64");
+  } catch {
+    return res.status(400).json({ error: "invalid signature encoding" });
+  }
+  if (signatureBytes.length !== nacl.sign.signatureLength) {
+    return res.status(400).json({ error: "invalid signature encoding" });
+  }
 
-    const distributorBalance = await contract.balanceOf(distributor.address);
-    if (distributorBalance < value) {
-      return res.status(503).json({ error: "distribution wallet is out of tokens — contact the team" });
-    }
+  const verified = nacl.sign.detached.verify(
+    new TextEncoder().encode(pending.message),
+    signatureBytes,
+    bs58.decode(user),
+  );
+  if (!verified) return res.status(401).json({ error: "signature does not match this wallet" });
 
-    const tx = await contract.transfer(user, value);
-    await tx.wait();
-    claimed.set(key, tx.hash);
+  const amount = allocationFor(user);
+  if (!amount) return res.status(403).json({ error: "this wallet is not eligible for this drop" });
 
-    let symbol = "";
-    try {
-      symbol = await contract.symbol();
-    } catch {
-      /* optional */
-    }
+  processing.add(key);
+  pendingNonces.delete(key);
+  try {
+    const stonk = solana.splToken({
+      mint: token,
+      tokenProgram: "auto",
+      commitment: "confirmed",
+    });
+    const txHash = await stonk.sendTransfer({
+      amount,
+      authority: distributor,
+      destinationOwner: user,
+      commitment: "confirmed",
+    });
+    const signature = txHash.toString();
+    claimed[key] = {
+      txHash: signature,
+      amount,
+      claimedAt: new Date().toISOString(),
+    };
+    persistClaims();
 
-    res.json({
+    return res.json({
       success: true,
       status: "success",
-      txHash: tx.hash,
+      txHash: signature,
       claimed: amount,
       token,
-      symbol,
+      symbol: "STONK",
       message: "airdrop sent",
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "claim execution failed" });
+  } catch (error) {
+    console.error("[claim]", error);
+    return res.status(500).json({ error: "claim transfer failed — contact the team" });
+  } finally {
+    processing.delete(key);
   }
 });
 
 app.get("/eligibility/:token/:address", (req, res) => {
   const { token, address } = req.params;
-  if (!ethers.isAddress(address)) return res.status(400).json({ error: "valid address required" });
+  if (validateMint(token) || !isPublicKey(address)) {
+    return res.status(400).json({ error: "valid mint and wallet required" });
+  }
   const amount = allocationFor(address);
-  const already = ethers.isAddress(token) && claimed.has(keyOf(token, address));
-  res.json({ eligible: Boolean(amount) && !already, amount: amount || "0", claimed: already });
+  const prior = claimed[keyOf(token, address)];
+  return res.json({
+    eligible: Boolean(amount) && !prior,
+    amount: amount || "0",
+    claimed: Boolean(prior),
+    txHash: prior?.txHash || "",
+  });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Airdrop claim service (distribution mode) running on port ${PORT} for ${CHAIN_LABEL}`);
+  console.log(`STONK Solana airdrop service running on port ${PORT}`);
 });

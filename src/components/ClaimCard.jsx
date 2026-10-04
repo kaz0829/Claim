@@ -49,7 +49,7 @@ export default function ClaimCard({ wallet }) {
             {explorerBase && (
               <a
                 className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/75 hover:text-white"
-                href={`${explorerBase}/address/${config.tokenAddress}`}
+                href={`${explorerBase}/token/${config.tokenAddress}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -128,16 +128,6 @@ export default function ClaimCard({ wallet }) {
               <p className="rounded-2xl border border-[color-mix(in_srgb,var(--c-accent)_50%,transparent)] bg-[color-mix(in_srgb,var(--c-accent)_12%,transparent)] px-4 py-3 text-sm text-white/85">
                 {config.ui.walletMissingText}
               </p>
-            ) : connected && !wallet.onConfiguredChain ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={wallet.switchNetwork}
-                disabled={wallet.busy || claim.busy}
-              >
-                {wallet.busy && <span className="spinner" aria-hidden="true" />}
-                {config.ui.switchNetworkText}
-              </button>
             ) : connected ? (
               <button type="button" className="btn btn-primary" onClick={claim.claim} disabled={claim.busy}>
                 {claim.busy && <span className="spinner" aria-hidden="true" />}

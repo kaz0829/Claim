@@ -1,3 +1,5 @@
 node_modules
 .env
 allocations.json
+claims.json
+claims.json.tmp

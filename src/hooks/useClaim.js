@@ -2,7 +2,12 @@ import { useCallback, useState } from "react";
 import config from "../config.js";
 import { prepareClaim, submitClaim } from "../lib/api.js";
 import { messageFor } from "../lib/errors.js";
-import { assertPrepared, getProvider } from "../lib/wallet.js";
+import {
+  assertPrepared,
+  getProvider,
+  publicKeyString,
+  signatureToBase64,
+} from "../lib/wallet.js";
 
 export function useClaim() {
   const [phase, setPhase] = useState("idle");
@@ -17,8 +22,7 @@ export function useClaim() {
     setPhase("preparing");
     try {
       const provider = getProvider();
-      const signer = await provider.getSigner();
-      const user = await signer.getAddress();
+      const user = publicKeyString(provider);
 
       const prepared = assertPrepared(
         await prepareClaim(config.backendBaseUrl, config.tokenAddress, user),
@@ -26,7 +30,9 @@ export function useClaim() {
       if (prepared.description) setDetail(prepared.description);
 
       setPhase("signing");
-      const signature = await signer.signMessage(prepared.message);
+      const encodedMessage = new TextEncoder().encode(prepared.message);
+      const signed = await provider.signMessage(encodedMessage, "utf8");
+      const signature = signatureToBase64(signed.signature || signed);
 
       setPhase("submitting");
       const result = await submitClaim(config.backendBaseUrl, {
