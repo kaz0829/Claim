@@ -278,23 +278,65 @@ a {
   color: var(--c-primary);
 }
 
-.terminal-value {
+.receipt-amount {
   margin: 2rem 0 0;
   font-family: var(--font-display);
-  font-size: 1.65rem;
+  font-size: clamp(3rem, 7vw, 5.25rem);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 0.9;
+  letter-spacing: -0.07em;
 }
 
-.terminal-caption {
-  margin: 0.45rem 0 1.5rem;
+.receipt-token {
+  margin: 0.8rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.receipt-token span {
+  margin-left: 0.3rem;
   color: rgba(255, 255, 255, 0.38);
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+
+.receipt-message {
+  margin: 1.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.receipt-signature {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+}
+
+.receipt-signature span {
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.12em;
+}
+
+.receipt-signature strong {
+  overflow: hidden;
+  color: var(--c-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .terminal-card ul {
   display: grid;
   gap: 0.7rem;
-  margin: 0;
+  margin: 1.25rem 0 0;
   padding: 1rem 0 0;
   border-top: 1px solid var(--c-line);
   list-style: none;

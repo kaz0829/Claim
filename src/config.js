@@ -46,10 +46,16 @@ const config = {
       "No token approvals or wallet transfers",
       "Distributor-funded SPL token delivery",
     ],
-    previewLabel: "Campaign preview",
-    previewValue: "Allocation revealed after connection",
-    statusLabel: "DROP_STATUS",
-    statusValue: "PREVIEW",
+    demoReceipt: {
+      eyebrow: "DEMO RECEIPT · UI PREVIEW",
+      status: "SENT",
+      amount: "10,000",
+      ticker: "STONK",
+      amountLabel: "Example allocation",
+      message: "A real Solana signature and explorer link appear here only after a confirmed claim.",
+      signatureLabel: "TRANSACTION",
+      signatureValue: "Available after confirmation",
+    },
   },
 
   ui: {
