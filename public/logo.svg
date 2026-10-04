@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Gloop">
+  <defs>
+    <radialGradient id="coin" cx="36%" cy="30%" r="72%">
+      <stop offset="0%" stop-color="#f7ffc4"/>
+      <stop offset="52%" stop-color="#e8ff47"/>
+      <stop offset="100%" stop-color="#b6d414"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="60" fill="url(#coin)"/>
+  <circle cx="34" cy="76" r="7" fill="#ff5c39" opacity="0.9"/>
+  <circle cx="94" cy="76" r="7" fill="#ff5c39" opacity="0.9"/>
+  <ellipse cx="46" cy="58" rx="8" ry="10" fill="#17170f"/>
+  <ellipse cx="82" cy="58" rx="8" ry="10" fill="#17170f"/>
+  <ellipse cx="48.5" cy="55" rx="2.3" ry="3" fill="#ffffff"/>
+  <ellipse cx="84.5" cy="55" rx="2.3" ry="3" fill="#ffffff"/>
+  <path d="M44 84c7 9 33 9 40 0" fill="none" stroke="#17170f" stroke-width="5" stroke-linecap="round"/>
+</svg>

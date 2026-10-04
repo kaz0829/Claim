@@ -1,0 +1,330 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --c-primary: #e8ff47;
+  --c-accent: #ff5c39;
+  --c-bg: #09090b;
+  --c-line: rgba(255, 255, 255, 0.1);
+}
+
+html {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: #f5f5f4;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(820px 420px at 50% -8%, color-mix(in srgb, var(--c-primary) 20%, transparent), transparent 62%),
+    radial-gradient(640px 380px at 110% 90%, color-mix(in srgb, var(--c-accent) 18%, transparent), transparent 58%),
+    var(--c-bg);
+}
+
+.grid-fade {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse at 50% 20%, #000 15%, transparent 70%);
+}
+
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(48px);
+  pointer-events: none;
+}
+
+.orb-a {
+  top: 18%;
+  left: -90px;
+  width: 260px;
+  height: 260px;
+  background: color-mix(in srgb, var(--c-primary) 28%, transparent);
+}
+
+.orb-b {
+  right: -120px;
+  bottom: 6%;
+  width: 340px;
+  height: 340px;
+  background: color-mix(in srgb, var(--c-accent) 22%, transparent);
+}
+
+.marquee {
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  border-bottom: 1px solid var(--c-line);
+  background: color-mix(in srgb, var(--c-primary) 9%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 1.75rem;
+  padding: 0.55rem 0;
+  animation: marquee 32s linear infinite;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--c-primary) 88%, white);
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+.logo-ring {
+  display: grid;
+  width: 118px;
+  height: 118px;
+  padding: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: conic-gradient(from 140deg, var(--c-primary), var(--c-accent), var(--c-primary));
+  box-shadow: 0 0 42px color-mix(in srgb, var(--c-primary) 32%, transparent);
+  animation: floaty 5.5s ease-in-out infinite;
+}
+
+.card-shell {
+  position: relative;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(12, 12, 14, 0.82);
+  border: 1px solid var(--c-line);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.card-shell::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--c-primary) 75%, transparent),
+    transparent 42%,
+    color-mix(in srgb, var(--c-accent) 70%, transparent)
+  );
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.btn {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.85rem 1.25rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease,
+    background 0.18s ease;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 3px;
+}
+
+.btn:disabled {
+  cursor: progress;
+  transform: none;
+  filter: saturate(0.85);
+}
+
+.btn-primary {
+  background: var(--c-primary);
+  color: #14140f;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--c-primary) 22%, transparent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--c-primary) 34%, transparent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--c-line);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  transform: translateY(-2px);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--c-primary);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-primary) 65%, transparent);
+  animation: pulse 1.8s ease-out infinite;
+}
+
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
+  animation: spin 0.7s linear infinite;
+}
+
+.success-mark {
+  width: 76px;
+  height: 76px;
+}
+
+.success-mark circle,
+.success-mark path {
+  fill: none;
+  stroke: var(--c-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.success-mark circle {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: draw 0.6s ease forwards;
+}
+
+.success-mark path {
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+  animation: draw 0.4s 0.4s ease forwards;
+}
+
+.rise {
+  animation: rise 0.7s ease both;
+}
+
+.rise-late {
+  animation-delay: 0.1s;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-primary) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .logo-ring,
+  .live-dot,
+  .spinner,
+  .success-mark circle,
+  .success-mark path,
+  .rise {
+    animation: none;
+  }
+
+  .success-mark circle,
+  .success-mark path {
+    stroke-dashoffset: 0;
+  }
+}
