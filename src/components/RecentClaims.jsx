@@ -58,7 +58,7 @@ export default function RecentClaims() {
 
   // 1. Keep time labels fresh
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), 10);
     return () => clearInterval(id);
   }, []);
 
