@@ -5,54 +5,67 @@ function randomWallet() {
   const chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   let s = "";
   for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s + "..." + chars[Math.floor(Math.random() * chars.length)] + chars[Math.floor(Math.random() * chars.length)] + chars[Math.floor(Math.random() * chars.length)];
+  return (
+    s +
+    "..." +
+    chars[Math.floor(Math.random() * chars.length)] +
+    chars[Math.floor(Math.random() * chars.length)] +
+    chars[Math.floor(Math.random() * chars.length)]
+  );
 }
 
 function randomUsd() {
-  // $10 – $30
-  return +(10 + Math.random() * 20).toFixed(1);
+  return +(10 + Math.random() * 20).toFixed(1); // $10–30
 }
 
 function formatAmount(usd) {
   const price = config.stonkPriceUsd || 0.002;
-  const tokens = Math.round(usd / price);
-  return tokens.toLocaleString();
+  return Math.round(usd / price).toLocaleString();
 }
 
 function makeClaim() {
   return {
+    id: Date.now() + Math.random(),
     wallet: randomWallet(),
     amount: formatAmount(randomUsd()),
-    time: "just now",
-    id: Date.now() + Math.random(),
+    createdAt: Date.now(),
   };
+}
+
+function timeAgo(createdAt, now) {
+  const seconds = Math.floor((now - createdAt) / 1000);
+  if (seconds < 10) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
 }
 
 export default function RecentClaims() {
   const [claims, setClaims] = useState(() => {
     const seed = config.recentClaimsSeed || [];
+    const now = Date.now();
     return seed.map((c, i) => ({
+      id: i,
       wallet: c.wallet,
       amount: formatAmount(c.usd),
-      time: `${(i + 1) * 3} min ago`,
-      id: i,
+      createdAt: now - (i + 1) * 3 * 60 * 1000, // stagger them
     }));
   });
 
-  useEffect(() => {
-    const tick = () => {
-      setClaims((prev) => {
-        const next = [makeClaim(), ...prev].slice(0, 7);
-        // age the older ones a bit
-        return next.map((c, i) =>
-          i === 0 ? c : { ...c, time: i === 1 ? "1 min ago" : `${i * 2 + 1} min ago` }
-        );
-      });
-    };
+  const [now, setNow] = useState(Date.now());
 
-    // first new one after 6–12s, then every 9–16s
+  // 1. Keep time labels fresh
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000); // every 15s
+    return () => clearInterval(id);
+  }, []);
+
+  // 2. Occasionally push a new claim
+  useEffect(() => {
     let timer = setTimeout(function loop() {
-      tick();
+      setClaims((prev) => [makeClaim(), ...prev].slice(0, 7));
       timer = setTimeout(loop, 9000 + Math.random() * 7000);
     }, 6000 + Math.random() * 6000);
 
@@ -89,7 +102,7 @@ export default function RecentClaims() {
                   {c.amount} {config.ticker}
                 </span>
                 <span className="w-20 text-right text-xs text-white/40">
-                  {c.time}
+                  {timeAgo(c.createdAt, now)}
                 </span>
               </div>
             </li>
