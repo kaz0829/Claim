@@ -99,6 +99,6 @@ recentClaims: [
   { wallet: "5hBc...2mP9", amount: "4,150", time: "14 min ago" },
   { wallet: "2kLf...7nR3", amount: "15,600", time: "18 min ago" },
   { wallet: "8tYw...1qA5", amount: "9,870", time: "23 min ago" },
-],
+]
 
 export default config;
