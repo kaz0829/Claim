@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import Hero from "./components/Hero.jsx";
 import Marquee from "./components/Marquee.jsx";
 import ProjectStory from "./components/ProjectStory.jsx";
+import RecentClaims from "./components/RecentClaims.jsx";   // ← add this
 
 export default function App() {
   const wallet = useWallet();
@@ -20,6 +21,7 @@ export default function App() {
         <Hero />
         <ClaimCard wallet={wallet} />
       </main>
+      <RecentClaims />          {/* ← add this */}
       <ProjectStory />
       <Footer />
     </div>

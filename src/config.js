@@ -60,7 +60,7 @@ const config = {
 
   ui: {
     pageTitle: "Claim $STONK | StonkFun Community Drop",
-    kicker: "Campaign preview · Solana",
+    kicker: "Live Claim · Solana",
     cardTitle: "Claim your STONK",
     disconnectLabel: "Disconnect",
     connectedLabel: "Connected",
@@ -92,5 +92,13 @@ const config = {
     stepDone: "Claimed",
   },
 };
+recentClaims: [
+  { wallet: "7GxK...9p2m", amount: "12,450", time: "2 min ago" },
+  { wallet: "9pRm...4kL1", amount: "8,200", time: "5 min ago" },
+  { wallet: "3vNq...8xT7", amount: "21,800", time: "9 min ago" },
+  { wallet: "5hBc...2mP9", amount: "4,150", time: "14 min ago" },
+  { wallet: "2kLf...7nR3", amount: "15,600", time: "18 min ago" },
+  { wallet: "8tYw...1qA5", amount: "9,870", time: "23 min ago" },
+],
 
 export default config;
