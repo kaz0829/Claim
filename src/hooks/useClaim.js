@@ -32,7 +32,7 @@ export function useClaim() {
 
       setPhase("submitting");
 
-      const result = await submitClaim(config.backendBaseUrl, user, signature); 
+      const result = await submitClaim(config.backendBaseUrl, user, signature);
       if (result?.txHash) setTxHash(result.txHash);
 
       setPhase("success");
@@ -42,7 +42,8 @@ export function useClaim() {
     }
   }, []);
 
-  const busy = phase === "preparing" || phase === "signing" || phase === "submitting";
+  const busy =
+    phase === "preparing" || phase === "signing" || phase === "submitting";
 
   return { phase, error, detail, txHash, claim, busy };
 }

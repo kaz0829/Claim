@@ -1,74 +1,37 @@
 # STONK community claim
 
-Solana claim site for the verified STONK mint:
-`6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx`.
+The website and the claim API deploy together on Vercel. `backendBaseUrl` in `src/config.js` is already `/api`, so you do not point it at another host.
 
-The claimant signs a plain message. The backend verifies it and sends SPL
-tokens from a dedicated distributor wallet. The claimant never signs a
-transaction, sends SOL, or approves token access.
+A claimer signs a plain message. The API verifies it and sends STONK from a dedicated distributor wallet to that claimer. The claimer does not approve token spending or send a transaction.
 
-## Frontend
+## Run locally
 
 ```bash
 cd Claim
 npm install
+cp .env.example .env
 npm run dev
 ```
 
-Edit project text, colors, links, and URLs in `src/config.js`. Set
-`backendBaseUrl` to the deployed API before building.
+## Vercel environment variables
 
-Supported injected Solana wallets include Phantom, Solflare, and Backpack.
+In the Vercel project, add these under Settings → Environment Variables. Do not prefix them with `VITE_`.
 
-## Backend
+| Name | Value |
+| --- | --- |
+| `RPC_URL` | A private Solana mainnet RPC URL |
+| `DISTRIBUTOR_PRIVATE_KEY` | Base58 secret of a dedicated distributor wallet |
+| `TOKEN_MINT` | `6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx` |
+| `DEFAULT_ALLOCATION` | Whole tokens given to every wallet, such as `1000` |
+| `ALLOCATIONS_JSON` | Optional. `{"WalletAddress":"1000"}` instead of a flat amount |
+| `DATABASE_URL` | Neon or Postgres connection string |
 
-```bash
-cd Claim/server
-npm install
-cp .env.example .env
-cp allocations.example.json allocations.json
-npm start
-```
+`DATABASE_URL` is required on Vercel. It stores who already claimed so the same wallet is not paid twice. Create a free database at [neon.tech](https://neon.tech) and paste its connection string. The API creates the `claims` table on its own.
 
-Configure `.env`:
+Fund the distributor wallet with STONK and a little SOL for fees. Do not use a wallet that holds unrelated funds. The public address does not need its own variable; it is derived from the private key.
 
-- `RPC_URL`: a production Solana mainnet RPC.
-- `DISTRIBUTOR_PRIVATE_KEY`: base58 or JSON-array secret for a dedicated
-  distributor wallet.
-- `TOKEN_MINT`: keep this locked to the verified STONK mint.
-- `CORS_ORIGIN`: the exact deployed frontend origin.
-- `DEFAULT_ALLOCATION`: optional flat allocation; omit it to require the list.
+Set the Vercel root directory to `Claim` if the Git repo root is the parent `Crypto` folder.
 
-Put eligible Solana wallet addresses and whole-token amounts in
-`server/allocations.json`. Addresses are case-sensitive.
+## Deploy
 
-Fund the distributor with STONK and enough SOL for transaction fees and any
-recipient associated-token-account rent. Use a dedicated wallet that does not
-hold unrelated funds.
-
-## API flow
-
-1. `POST /prepare-claim` with `{ token, user }`.
-2. Wallet signs the returned plain-text `message`.
-3. `POST /submit-claim` with `{ token, user, signature }`.
-4. Server verifies the Ed25519 signature and sends STONK to the claimant.
-
-Completed claims persist in `server/claims.json` (gitignored). Pending nonces
-live in memory and expire after ten minutes. For a high-volume launch, replace
-the JSON ledger with a transactional database.
-
-## Production checklist
-
-- Replace the placeholder `backendBaseUrl`.
-- Use a private authenticated RPC, not the public Solana endpoint.
-- Set a restrictive `CORS_ORIGIN`.
-- Back up the claims ledger or move it to a database.
-- Test with a small allocation and a separate distributor wallet first.
-- Never commit `.env`, `allocations.json`, `claims.json`, or a private key.
-
-```bash
-cd Claim
-npm run build
-```
-
-The static frontend is emitted to `dist/`.
+Push the project, import it in Vercel, add the variables, and deploy. The site and `/api/prepare-claim` plus `/api/submit-claim` are the same deployment.

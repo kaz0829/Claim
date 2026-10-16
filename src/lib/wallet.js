@@ -33,3 +33,10 @@ export function publicKeyString(provider) {
   if (!value) throw new Error("NO_WALLET");
   return value;
 }
+
+export function signatureToBase64(signature) {
+  const bytes = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
+}

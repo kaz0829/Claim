@@ -79,11 +79,11 @@ export default function RecentClaims() {
           <div className="flex items-center gap-2">
             <span className="live-dot" />
             <h3 className="font-display text-sm font-bold tracking-wide uppercase">
-              Recent Claims
+              Sample claims
             </h3>
           </div>
           <span className="text-xs font-semibold tracking-wider text-white/40 uppercase">
-            Live
+            Preview
           </span>
         </div>
 

