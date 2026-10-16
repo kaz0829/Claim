@@ -32,7 +32,7 @@ export function useClaim() {
 
       setPhase("submitting");
 
-      const result = await submitClaim(config.backendBaseUrl, user);
+      const result = await submitClaim(config.backendBaseUrl, user, signature); 
       if (result?.txHash) setTxHash(result.txHash);
 
       setPhase("success");

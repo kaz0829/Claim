@@ -9,11 +9,11 @@ export async function prepareClaim(baseUrl, user) {
   return data;
 }
 
-export async function submitClaim(baseUrl, user) {
+export async function submitClaim(baseUrl, user, signature) {
   const res = await fetch(`${baseUrl}/submit-claim`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user }),
+    body: JSON.stringify({ user, signature }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "submit failed");
