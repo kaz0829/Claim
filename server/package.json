@@ -9,12 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@solana/spl-token": "^0.4.15",
-    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "0.4.9",
+    "@solana/web3.js": "1.95.4",
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "uuid": "9.0.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -23,6 +24,9 @@
     "vite": "^8.3.2"
   },
   "overrides": {
-    "uuid": "9.0.1"
+    "uuid": "9.0.1",
+    "rpc-websockets": {
+      "uuid": "9.0.1"
+    }
   }
 }
