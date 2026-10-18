@@ -1,21 +1,28 @@
 {
-  "name": "claim-server",
-  "version": "3.0.0",
+  "name": "claim",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
-  "description": "Solana airdrop backend — distributes project tokens to eligible users.",
-  "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@solana/client": "^1.7.0",
-    "@solana/kit": "^8.4.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.0",
     "bs58": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.2",
-    "tweetnacl": "^1.0.3"
+    "buffer": "^6.0.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.2"
+  },
+  "overrides": {
+    "uuid": "9.0.1"
   }
 }
